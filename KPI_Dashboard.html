@@ -49,6 +49,8 @@
         .kpi-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 4px solid #e5e7eb; }
         .kpi-card.on-target { border-left-color: #16a34a; background: #f0fdf4; }
         .kpi-card.off-target { border-left-color: #dc2626; background: #fef2f2; }
+        .kpi-card.slightly-below { border-left-color: #f59e0b; background: #fffbeb; }
+        .kpi-card.moderately-below { border-left-color: #ff9a00; background: #fff7ed; }
         .kpi-label { font-size: 13px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
         .kpi-value { font-size: 26px; font-weight: 700; color: #1e3a5f; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
         .kpi-card.on-target .kpi-value { color: #16a34a; }
@@ -77,6 +79,31 @@
         .status-on { color: #16a34a; font-weight: 600; }
         .status-off { color: #dc2626; font-weight: 600; }
         .checkmark { margin-right: 5px; }
+
+        /* Executive Summary Section */
+        .executive-summary { display: none; }
+        .executive-summary.show { display: block; }
+        .site-health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 40px; }
+        .site-health-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 28px; border-top: 4px solid #3b82f6; }
+        .site-health-card.health-excellent { border-top-color: #16a34a; }
+        .site-health-card.health-good { border-top-color: #3b82f6; }
+        .site-health-card.health-fair { border-top-color: #f59e0b; }
+        .site-health-card.health-poor { border-top-color: #dc2626; }
+        .site-name { font-size: 18px; font-weight: 700; color: #1e3a5f; margin-bottom: 16px; }
+        .health-score-container { text-align: center; margin-bottom: 24px; }
+        .health-score { font-size: 48px; font-weight: 700; margin-bottom: 4px; }
+        .health-score.health-excellent { color: #16a34a; }
+        .health-score.health-good { color: #3b82f6; }
+        .health-score.health-fair { color: #f59e0b; }
+        .health-score.health-poor { color: #dc2626; }
+        .health-label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .metrics-section { margin-bottom: 20px; border-top: 1px solid #f0f0f0; padding-top: 16px; }
+        .metrics-title { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .metric-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 13px; }
+        .metric-name { color: #1e3a5f; font-weight: 500; }
+        .metric-value { font-weight: 600; }
+        .metric-on { color: #16a34a; }
+        .metric-off { color: #dc2626; }
 
         /* KPI Detail Modal */
         .kpi-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
@@ -160,6 +187,8 @@
                 <select id="viewType" onchange="updateDashboard()">
                     <option value="by-month">By Month</option>
                     <option value="ytd">Year to Date</option>
+                    <option value="site-comparison">Site Comparison</option>
+                    <option value="executive-summary">Executive Summary</option>
                 </select>
 
                 <label>Month:</label>
@@ -225,14 +254,28 @@
         </div>
 
         <div class="kpi-cards" id="kpiCards"></div>
-        
+
         <div class="charts-section">
             <div class="chart-container">
                 <div class="chart-title">Current Performance vs Target</div>
                 <canvas id="performanceChart"></canvas>
             </div>
         </div>
-        
+
+        <div id="siteComparisonSection" style="display: none;">
+            <div class="charts-section">
+                <div class="chart-container">
+                    <div class="chart-title">KPI Performance by Site</div>
+                    <canvas id="siteComparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="executiveSummarySection" class="executive-summary">
+            <div class="site-health-grid" id="siteHealthGrid"></div>
+        </div>
+
+
         <div class="table-section">
             <div class="table-title">Detailed KPI Data</div>
             <table id="kpiTable" style="display: none;">
@@ -327,7 +370,7 @@
     <script>
         let monthlyData = {"2026":{"JAN":{"CS CSAT":{"target":80,"GDL":93,"MNL":71,"CR":86,"RIC":84},"CLL CSAT":{"target":80,"GDL":88,"MNL":71,"CR":null,"RIC":80},"RCVR CSAT":{"target":70,"GDL":75,"MNL":86,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":446,"MNL":458,"CR":464,"RIC":414},"ESC RATE":{"target":5,"GDL":3.3,"MNL":4.8,"CR":5.7,"RIC":3.9},"FCR":{"target":90,"GDL":80,"MNL":77,"CR":73,"RIC":80},"CS ISAR":{"target":100,"GDL":91,"MNL":79.2,"CR":84.5,"RIC":null},"CLL ISAR":{"target":100,"GDL":107,"MNL":93.9,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":102,"MNL":88.7,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.4,"MNL":98,"CR":100,"RIC":98},"BI":{"target":95,"GDL":98.8,"MNL":98.4,"CR":99.8,"RIC":100},"CHAT MFRT":{"target":10,"GDL":48,"MNL":19,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":93.9,"MNL":90.5,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":2,"MNL":9,"CR":0,"RIC":0}},"FEB":{"CS CSAT":{"target":80,"GDL":92,"MNL":71,"CR":90,"RIC":92},"CLL CSAT":{"target":80,"GDL":83,"MNL":70,"CR":null,"RIC":83},"RCVR CSAT":{"target":70,"GDL":83,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":402,"MNL":466,"CR":464,"RIC":414},"ESC RATE":{"target":5,"GDL":4.1,"MNL":4.9,"CR":1.2,"RIC":3.8},"FCR":{"target":90,"GDL":80,"MNL":77,"CR":79,"RIC":80},"CS ISAR":{"target":100,"GDL":93,"MNL":94.2,"CR":89.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":102,"MNL":100.5,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":98,"MNL":103.9,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.2,"MNL":97.3,"CR":100,"RIC":94},"BI":{"target":95,"GDL":98.4,"MNL":98.4,"CR":99.7,"RIC":98},"CHAT MFRT":{"target":10,"GDL":19,"MNL":19,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":87.9,"MNL":82.7,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":2,"MNL":7,"CR":0,"RIC":0}},"MAR":{"CS CSAT":{"target":80,"GDL":91,"MNL":68,"CR":86,"RIC":82},"CLL CSAT":{"target":80,"GDL":89,"MNL":68,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":81,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":433,"MNL":474,"CR":522,"RIC":412},"ESC RATE":{"target":5,"GDL":3.8,"MNL":4.9,"CR":9.4,"RIC":2.7},"FCR":{"target":90,"GDL":80,"MNL":78,"CR":80,"RIC":78},"CS ISAR":{"target":100,"GDL":87,"MNL":108.1,"CR":91.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":117,"MNL":98.5,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":103,"MNL":105.1,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.9,"MNL":97.4,"CR":95,"RIC":93},"BI":{"target":95,"GDL":98.5,"MNL":99.3,"CR":98.9,"RIC":97},"CHAT MFRT":{"target":10,"GDL":10,"MNL":7,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":91.1,"MNL":83.2,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":6,"MNL":3,"CR":20,"RIC":42}},"APR":{"CS CSAT":{"target":80,"GDL":93,"MNL":73,"CR":85,"RIC":90},"CLL CSAT":{"target":80,"GDL":82,"MNL":71,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":83,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":455,"MNL":469,"CR":485,"RIC":545},"ESC RATE":{"target":5,"GDL":3.9,"MNL":5.2,"CR":0.9,"RIC":2.9},"FCR":{"target":90,"GDL":80,"MNL":78,"CR":78,"RIC":78},"CS ISAR":{"target":100,"GDL":103.2,"MNL":107.3,"CR":102.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":106.3,"MNL":107.7,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":108.2,"MNL":106.3,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":99.3,"MNL":95.2,"CR":96.6,"RIC":100},"BI":{"target":95,"GDL":98.7,"MNL":98.1,"CR":96.1,"RIC":98},"CHAT MFRT":{"target":10,"GDL":11,"MNL":7,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":89.9,"MNL":86.4,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":4,"MNL":12,"CR":27,"RIC":25}},"MAY":{"CS CSAT":{"target":80,"GDL":93,"MNL":71,"CR":86,"RIC":85},"CLL CSAT":{"target":80,"GDL":89,"MNL":69,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":100,"MNL":71,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":456,"MNL":473,"CR":469,"RIC":453},"ESC RATE":{"target":5,"GDL":3.8,"MNL":5,"CR":0.9,"RIC":3.4},"FCR":{"target":90,"GDL":80,"MNL":79,"CR":77,"RIC":80},"CS ISAR":{"target":100,"GDL":93.5,"MNL":108.1,"CR":104.5,"RIC":null},"CLL ISAR":{"target":100,"GDL":88.7,"MNL":109.4,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":105.8,"MNL":105.8,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":100,"MNL":98.9,"CR":100,"RIC":100},"BI":{"target":95,"GDL":99.1,"MNL":99.2,"CR":100,"RIC":100},"CHAT MFRT":{"target":10,"GDL":13,"MNL":9,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":93.4,"MNL":86.6,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":5,"MNL":3,"CR":0,"RIC":0}},"JUN":{"CS CSAT":{"target":80,"GDL":89,"MNL":71,"CR":95,"RIC":86},"CLL CSAT":{"target":80,"GDL":87,"MNL":71,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":70,"MNL":94,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":456,"MNL":473,"CR":480,"RIC":455},"ESC RATE":{"target":5,"GDL":4.3,"MNL":5.5,"CR":0.4,"RIC":3.1},"FCR":{"target":90,"GDL":79,"MNL":79,"CR":72,"RIC":79},"CS ISAR":{"target":100,"GDL":94.5,"MNL":106.7,"CR":106.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":103.7,"MNL":106,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":91.3,"MNL":104.3,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":100,"MNL":92.4,"CR":100,"RIC":100},"BI":{"target":95,"GDL":99.7,"MNL":98.8,"CR":100,"RIC":99},"CHAT MFRT":{"target":10,"GDL":12,"MNL":8,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":91,"MNL":85.2,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":5,"MNL":4,"CR":0,"RIC":0}},"JULY":{},"AUG":{},"SEPT":{},"OCT":{},"NOV":{},"DEC":{}},"2027":{"JAN":{},"FEB":{},"MAR":{},"APR":{},"MAY":{},"JUN":{},"JULY":{},"AUG":{},"SEPT":{},"OCT":{},"NOV":{},"DEC":{}}};
         let selectedSites = {GDL: true, MNL: true, CR: true, RIC: true};
-        let performanceChart, siteChart;
+        let performanceChart, siteChart, siteComparisonChart;
         let currentKpiDetail = null;
         let kpiDetailChart = null;
         let currentKpiView = 'by-site';
@@ -458,10 +501,175 @@
             return months[currentIndex - 1];
         }
 
+        function drawExecutiveSummary(year) {
+            // Hide standard sections
+            document.getElementById('summaryStats').style.display = 'none';
+            document.getElementById('kpiCards').style.display = 'none';
+            document.querySelector('.charts-section').style.display = 'none';
+            document.getElementById('kpiTable').style.display = 'none';
+            document.getElementById('siteComparisonSection').style.display = 'none';
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('executiveSummarySection').classList.add('show');
+
+            // Calculate YTD data
+            const ytdData = {};
+            const months = Object.keys(monthlyData[year]);
+            for (let m of months) {
+                const monthData = monthlyData[year][m];
+                for (let kpi in monthData) {
+                    if (!ytdData[kpi]) {
+                        ytdData[kpi] = { target: monthData[kpi].target, sums: {GDL: 0, MNL: 0, CR: 0, RIC: 0}, counts: {GDL: 0, MNL: 0, CR: 0, RIC: 0} };
+                    }
+                    ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                        const val = monthData[kpi][site];
+                        if (!isNaN(val) && val !== null) {
+                            ytdData[kpi].sums[site] += val;
+                            ytdData[kpi].counts[site]++;
+                        }
+                    });
+                }
+            }
+
+            // Convert to averages
+            for (let kpi in ytdData) {
+                ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                    ytdData[kpi][site] = ytdData[kpi].counts[site] > 0 ? ytdData[kpi].sums[site] / ytdData[kpi].counts[site] : null;
+                });
+                delete ytdData[kpi].sums;
+                delete ytdData[kpi].counts;
+            }
+
+            const sites = ['GDL', 'MNL', 'CR', 'RIC'];
+            const siteNames = {'GDL': 'Guadalajara', 'MNL': 'Manila', 'CR': 'Costa Rica', 'RIC': 'Richmond'};
+
+            const cardsHTML = sites.map(site => {
+                const siteKpis = {};
+                let weightedOnTarget = 0;
+                let totalWeight = 0;
+                let onTargetCount = 0;
+                const priorityMetrics = ['CS CSAT', 'CLL CSAT', 'RCVR CSAT', 'CS AHT'];
+                const lowPriorityMetrics = ['CHAT MFRT', 'CHAT CSAT'];
+                const priorityWeight = 1.25;
+                const lowPriorityWeight = 0.5;
+
+                for (let kpi in ytdData) {
+                    const value = ytdData[kpi][site];
+                    if (value !== null && !isNaN(value)) {
+                        const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
+                        const isOnTarget = lowerBetter ? value <= ytdData[kpi].target : value >= ytdData[kpi].target;
+                        let weight = 1;
+                        if (priorityMetrics.includes(kpi)) weight = priorityWeight;
+                        else if (lowPriorityMetrics.includes(kpi)) weight = lowPriorityWeight;
+
+                        totalWeight += weight;
+                        if (isOnTarget) {
+                            weightedOnTarget += weight;
+                            onTargetCount++;
+                        }
+                        siteKpis[kpi] = {value, target: ytdData[kpi].target, isOnTarget, lowerBetter};
+                    }
+                }
+
+                const healthPercent = totalWeight > 0 ? Math.round((weightedOnTarget / totalWeight) * 100) : 0;
+                const totalKpis = Object.keys(siteKpis).length;
+                let healthClass = 'health-excellent';
+                if (healthPercent < 50) healthClass = 'health-poor';
+                else if (healthPercent < 70) healthClass = 'health-fair';
+                else if (healthPercent < 85) healthClass = 'health-good';
+
+                // Get top problems (off-target KPIs) - prioritize weighted metrics
+                const problems = Object.entries(siteKpis)
+                    .filter(([kpiName, kpi]) => !kpi.isOnTarget)
+                    .map(([kpiName, kpi]) => {
+                        const percentGap = kpi.lowerBetter ? ((kpi.value - kpi.target) / kpi.target) * 100 : ((kpi.target - kpi.value) / kpi.target) * 100;
+                        const isPriority = priorityMetrics.includes(kpiName);
+                        const isLowPriority = lowPriorityMetrics.includes(kpiName);
+                        return [kpiName, {...kpi, percentGap, isPriority, isLowPriority}];
+                    })
+                    .sort((a, b) => {
+                        // Prioritize high-weight metrics, deprioritize low-weight metrics, then sort by gap
+                        if (a[1].isPriority && !b[1].isPriority) return -1;
+                        if (!a[1].isPriority && b[1].isPriority) return 1;
+                        if (a[1].isLowPriority && !b[1].isLowPriority) return 1;
+                        if (!a[1].isLowPriority && b[1].isLowPriority) return -1;
+                        return b[1].percentGap - a[1].percentGap;
+                    })
+                    .slice(0, 2);
+
+                // Get top performers (on-target KPIs)
+                const winners = Object.entries(siteKpis)
+                    .filter(([_, kpi]) => kpi.isOnTarget)
+                    .slice(0, 2);
+
+                let problemsHTML = problems.length > 0 ? problems.map(([kpi]) =>
+                    `<div class="metric-item"><span class="metric-name">${kpi}</span><span class="metric-value metric-off">❌</span></div>`
+                ).join('') : '<div style="color: #999; font-size: 12px;">All metrics on target!</div>';
+
+                let winnersHTML = winners.length > 0 ? winners.map(([kpi]) =>
+                    `<div class="metric-item"><span class="metric-name">${kpi}</span><span class="metric-value metric-on">✓</span></div>`
+                ).join('') : '<div style="color: #999; font-size: 12px;">No metrics on target yet</div>';
+
+                return `
+                    <div class="site-health-card ${healthClass}">
+                        <div class="site-name">${siteNames[site]}</div>
+                        <div class="health-score-container">
+                            <div class="health-score ${healthClass}">${healthPercent}%</div>
+                            <div class="health-label">Overall Health YTD</div>
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">📊 On Target KPIs</div>
+                            <div>${onTargetCount} of ${totalKpis} metrics</div>
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">⚠️ Top Problem Areas</div>
+                            ${problemsHTML}
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">⭐ Top Performers</div>
+                            ${winnersHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('siteHealthGrid').innerHTML = cardsHTML;
+        }
+
         function updateDashboard() {
             const year = document.getElementById('yearSelect').value;
             const month = document.getElementById('monthSelect').value;
             const viewType = document.getElementById('viewType').value;
+
+            if (viewType === 'executive-summary') {
+                drawExecutiveSummary(year);
+                return;
+            }
+
+            if (viewType === 'site-comparison') {
+                const data = monthlyData[year][month];
+                if (!data || Object.keys(data).length === 0) {
+                    document.getElementById('siteComparisonSection').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    return;
+                }
+                document.getElementById('summaryStats').style.display = 'none';
+                document.getElementById('kpiCards').style.display = 'none';
+                document.querySelector('.charts-section').style.display = 'none';
+                document.getElementById('kpiTable').style.display = 'none';
+                document.getElementById('executiveSummarySection').classList.remove('show');
+                document.getElementById('siteComparisonSection').style.display = 'block';
+                document.getElementById('noData').style.display = 'none';
+                setTimeout(() => drawSiteComparisonChart(data), 100);
+                document.getElementById('updateTime').textContent = new Date().toLocaleString();
+                return;
+            }
+
+            // Show standard view sections (restores original layout)
+            document.getElementById('summaryStats').style.display = 'grid';
+            document.getElementById('kpiCards').style.display = 'grid';
+            document.querySelector('.charts-section').style.display = 'grid';
+            document.getElementById('siteComparisonSection').style.display = 'none';
+            document.getElementById('executiveSummarySection').classList.remove('show');
 
             // For YTD view, aggregate data across all months
             let data = {};
@@ -519,10 +727,28 @@
 
                 const avg = values.length ? values.reduce((a,b) => a+b) / values.length : 0;
 
-                // Determine if on target
+                // Determine if on target and calculate distance from target
                 const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
-                const onTarget = lowerBetter ? avg <= vals.target : avg >= vals.target;
-                const statusClass = onTarget ? 'on-target' : 'off-target';
+                let statusClass = 'on-target';
+                let onTarget = false;
+
+                if (lowerBetter) {
+                    onTarget = avg <= vals.target;
+                    if (!onTarget) {
+                        const percentageOver = ((avg - vals.target) / vals.target) * 100;
+                        if (percentageOver <= 10) statusClass = 'slightly-below';
+                        else if (percentageOver <= 25) statusClass = 'moderately-below';
+                        else statusClass = 'off-target';
+                    }
+                } else {
+                    onTarget = avg >= vals.target;
+                    if (!onTarget) {
+                        const percentageUnder = ((vals.target - avg) / vals.target) * 100;
+                        if (percentageUnder <= 10) statusClass = 'slightly-below';
+                        else if (percentageUnder <= 25) statusClass = 'moderately-below';
+                        else statusClass = 'off-target';
+                    }
+                }
 
                 // Calculate trend from previous month
                 const prevMonth = getPreviousMonth(month);
@@ -592,9 +818,24 @@
 
                 const avg = values.length ? values.reduce((a,b) => a+b) / values.length : 0;
                 const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
-                const onTarget = lowerBetter ? avg <= vals.target : avg >= vals.target;
-                const status = onTarget ? '✓ On Target' : '✗ Below Target';
-                const statusClass = onTarget ? 'status-on' : 'status-off';
+                let onTarget = false;
+                let status = '✗ Below Target';
+                let statusClass = 'status-off';
+
+                if (lowerBetter) {
+                    onTarget = avg <= vals.target;
+                    if (onTarget) {
+                        status = '✓ On Target';
+                        statusClass = 'status-on';
+                    }
+                } else {
+                    onTarget = avg >= vals.target;
+                    if (onTarget) {
+                        status = '✓ On Target';
+                        statusClass = 'status-on';
+                    }
+                }
+
                 return `
                     <tr>
                         <td class="kpi-name">${kpi}</td>
@@ -738,6 +979,44 @@
                 console.error('Chart error:', e);
                 console.error('Stack:', e.stack);
             }
+        }
+
+        function drawSiteComparisonChart(data) {
+            const labels = Object.keys(data);
+            const sites = ['GDL', 'MNL', 'CR', 'RIC'];
+            const datasets = sites.map((site, idx) => {
+                const values = labels.map(kpi => {
+                    const val = data[kpi][site];
+                    return !isNaN(val) && val !== null ? val : 0;
+                });
+                const colors = ['#3b82f6', '#a855f7', '#22c55e', '#f97316'];
+                return {
+                    label: site,
+                    data: values,
+                    backgroundColor: colors[idx]
+                };
+            });
+
+            const ctx = document.getElementById('siteComparisonChart');
+            if (siteComparisonChart) siteComparisonChart.destroy();
+
+            siteComparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
         }
 
         updateDashboard();
