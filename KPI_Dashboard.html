@@ -1,1 +1,1168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>KPI Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        .header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5aa0 100%); color: white; padding: 25px 40px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-title { font-size: 28px; font-weight: 600; }
+        .header-date { font-size: 13px; opacity: 0.8; }
+        
+        .header-controls { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+        
+        .site-buttons { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+        .site-buttons label { margin-right: 15px; font-weight: 600; font-size: 14px; }
+        .site-btn { padding: 8px 20px; background: #3b82f6; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.3s; min-width: 60px; text-align: center; }
+        .site-btn:hover { background: #2563eb; }
+        .site-btn.active { background: #1e40af; }
+        .site-btn:not(.active) { opacity: 0.6; }
+        
+        .view-controls { display: flex; gap: 15px; align-items: center; }
+        .view-controls label { font-weight: 600; font-size: 14px; }
+        .view-controls select { padding: 8px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; font-size: 13px; cursor: pointer; }
+        .view-controls select option { background: #1e3a5f; color: white; }
 
+        #compareControls { display: flex !important; }
+        #compareControls label { color: white; }
+        #compareControls select { padding: 8px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; font-size: 13px; cursor: pointer; }
+        #compareControls select option { background: #1e3a5f; color: white; }
+        
+        .container { padding: 40px; max-width: 1400px; margin: 0 auto; }
+
+        .summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+        .stat-on-target { background: #f0fdf4; border-left: 4px solid #16a34a; }
+        .stat-below-target { background: #fef2f2; border-left: 4px solid #dc2626; }
+        .stat-health { background: #eff6ff; border-left: 4px solid #3b82f6; }
+        .stat-label { font-size: 14px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .stat-value { font-size: 40px; font-weight: 700; }
+        .stat-on-target .stat-value { color: #16a34a; }
+        .stat-below-target .stat-value { color: #dc2626; }
+        .stat-health .stat-value { color: #3b82f6; }
+        
+        .kpi-cards { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; margin-bottom: 30px; }
+        .kpi-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 4px solid #e5e7eb; }
+        .kpi-card.on-target { border-left-color: #16a34a; background: #f0fdf4; }
+        .kpi-card.off-target { border-left-color: #dc2626; background: #fef2f2; }
+        .kpi-card.slightly-below { border-left-color: #f59e0b; background: #fffbeb; }
+        .kpi-card.moderately-below { border-left-color: #ff9a00; background: #fff7ed; }
+        .kpi-label { font-size: 13px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .kpi-value { font-size: 26px; font-weight: 700; color: #1e3a5f; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .kpi-card.on-target .kpi-value { color: #16a34a; }
+        .kpi-card.off-target .kpi-value { color: #dc2626; }
+        .kpi-trend { font-size: 22px; }
+        .trend-up { color: #16a34a; }
+        .trend-down { color: #dc2626; }
+        .kpi-target { font-size: 11px; color: #999; }
+        .kpi-target span { font-weight: 600; color: #1e3a5f; }
+        
+        .charts-section { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 40px; }
+        .chart-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 480px; position: relative; }
+        .chart-title { font-size: 16px; font-weight: 600; color: #1e3a5f; margin-bottom: 20px; }
+        canvas { max-height: 350px; }
+        
+        .table-section { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .table-title { font-size: 16px; font-weight: 600; color: #1e3a5f; margin-bottom: 20px; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        thead { border-bottom: 2px solid #e5e7eb; }
+        th { padding: 15px; text-align: left; font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 15px; border-bottom: 1px solid #e5e7eb; }
+        tr:hover { background: #f9fafb; }
+        
+        .kpi-name { font-weight: 600; color: #1e3a5f; }
+        .status-on { color: #16a34a; font-weight: 600; }
+        .status-off { color: #dc2626; font-weight: 600; }
+        .checkmark { margin-right: 5px; }
+
+        /* Executive Summary Section */
+        .executive-summary { display: none; }
+        .executive-summary.show { display: block; }
+        .site-health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 40px; }
+        .site-health-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 28px; border-top: 4px solid #3b82f6; }
+        .site-health-card.health-excellent { border-top-color: #16a34a; }
+        .site-health-card.health-good { border-top-color: #3b82f6; }
+        .site-health-card.health-fair { border-top-color: #f59e0b; }
+        .site-health-card.health-poor { border-top-color: #dc2626; }
+        .site-name { font-size: 18px; font-weight: 700; color: #1e3a5f; margin-bottom: 16px; }
+        .health-score-container { text-align: center; margin-bottom: 24px; }
+        .health-score { font-size: 48px; font-weight: 700; margin-bottom: 4px; }
+        .health-score.health-excellent { color: #16a34a; }
+        .health-score.health-good { color: #3b82f6; }
+        .health-score.health-fair { color: #f59e0b; }
+        .health-score.health-poor { color: #dc2626; }
+        .health-label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .metrics-section { margin-bottom: 20px; border-top: 1px solid #f0f0f0; padding-top: 16px; }
+        .metrics-title { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .metric-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 13px; }
+        .metric-name { color: #1e3a5f; font-weight: 500; }
+        .metric-value { font-weight: 600; }
+        .metric-on { color: #16a34a; }
+        .metric-off { color: #dc2626; }
+
+        /* KPI Detail Modal */
+        .kpi-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .kpi-modal.show { display: flex; }
+        .kpi-modal-content { background: white; border-radius: 12px; padding: 35px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); border: 1px solid rgba(0,0,0,0.05); }
+        .kpi-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
+        .kpi-modal-title { font-size: 28px; font-weight: 700; color: #1e3a5f; }
+        .kpi-modal-close { font-size: 32px; cursor: pointer; color: #bbb; transition: all 0.3s; }
+        .kpi-modal-close:hover { color: #333; transform: scale(1.2); }
+        .kpi-view-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
+        .toggle-btn { padding: 10px 18px; background: #f0f0f0; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; color: #666; }
+        .toggle-btn:hover { background: #e8e8e8; }
+        .toggle-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        .kpi-detail-filters { display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap; align-items: center; padding: 15px; background: #f9fafb; border-radius: 8px; }
+        .kpi-detail-filters label { font-weight: 600; color: #1e3a5f; font-size: 14px; }
+        .kpi-detail-filters select { padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; transition: all 0.3s; }
+        .kpi-detail-filters select:hover { border-color: #3b82f6; }
+        .kpi-detail-filters .site-filter { display: flex; gap: 15px; flex-wrap: wrap; }
+        .kpi-detail-filters .site-filter label { display: flex; align-items: center; gap: 5px; margin: 0; font-weight: 500; }
+        .kpi-detail-filters .site-filter input { cursor: pointer; }
+        .kpi-detail-chart { position: relative; height: 420px; margin-top: 30px; background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%); padding: 25px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; }
+        canvas { max-height: 350px; }
+        
+        @media (max-width: 1200px) {
+            .charts-section { grid-template-columns: 1fr; }
+        }
+        
+        .no-data { text-align: center; color: #999; padding: 60px 20px; }
+        
+        /* Hidden data import section */
+        .data-input { 
+            margin-top: 100px; 
+            padding: 20px; 
+            background: #f9fafb; 
+            border-radius: 8px; 
+            border-left: 4px solid #3b82f6; 
+            display: none; 
+        }
+        .data-input.show { display: block; }
+        .data-input h3 { margin-bottom: 15px; color: #1e3a5f; }
+        .month-selector { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        .month-selector label { font-weight: 600; color: #1e3a5f; }
+        .month-selector select { padding: 8px 12px; border: 2px solid #3b82f6; border-radius: 4px; font-size: 14px; }
+        textarea { width: 100%; height: 120px; padding: 12px; font-family: monospace; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="background: white; padding: 10px 16px; border-radius: 6px; font-weight: 700; color: #1e3a5f; font-size: 18px;">
+                    Koalafi
+                </div>
+                <div>
+                    <div class="header-title">KPI Dashboard</div>
+                    <div class="header-date">Last updated: <span id="updateTime"></span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="header-controls">
+            <div class="site-buttons">
+                <label>Sites:</label>
+                <button class="site-btn active" onclick="toggleSite('GDL')">GDL</button>
+                <button class="site-btn active" onclick="toggleSite('MNL')">MNL</button>
+                <button class="site-btn active" onclick="toggleSite('CR')">CR</button>
+                <button class="site-btn active" onclick="toggleSite('RIC')">RIC</button>
+            </div>
+            
+            <div class="view-controls">
+                <label>Year:</label>
+                <select id="yearSelect" onchange="updateDashboard()">
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                </select>
+
+                <label>View:</label>
+                <select id="viewType" onchange="updateDashboard()">
+                    <option value="by-month">By Month</option>
+                    <option value="ytd">Year to Date</option>
+                    <option value="site-comparison">Site Comparison</option>
+                    <option value="executive-summary">Executive Summary</option>
+                </select>
+
+                <label>Month:</label>
+                <select id="monthSelect" onchange="updateDashboard()">
+                    <option value="JAN">January</option>
+                    <option value="FEB">February</option>
+                    <option value="MAR">March</option>
+                    <option value="APR">April</option>
+                    <option value="MAY">May</option>
+                    <option value="JUN">June</option>
+                    <option value="JULY">July</option>
+                    <option value="AUG">August</option>
+                    <option value="SEPT">September</option>
+                    <option value="OCT">October</option>
+                    <option value="NOV">November</option>
+                    <option value="DEC">December</option>
+                </select>
+
+                <button onclick="downloadCSV()" style="padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;">Download CSV</button>
+
+                <button onclick="document.getElementById('dataInputSection').classList.toggle('show')" style="padding: 8px 16px; background: #f97316; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; margin-left: 10px;">Import Data</button>
+
+                <label style="margin-left: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="compareToggle" onchange="toggleComparison()">
+                    Compare Months
+                </label>
+
+                <div id="compareControls" style="display: none; align-items: center; gap: 10px;">
+                    <label>vs</label>
+                    <select id="compareMonthSelect" onchange="updateDashboard()">
+                        <option value="JAN">January</option>
+                        <option value="FEB">February</option>
+                        <option value="MAR">March</option>
+                        <option value="APR">April</option>
+                        <option value="MAY">May</option>
+                        <option value="JUN">June</option>
+                        <option value="JULY">July</option>
+                        <option value="AUG">August</option>
+                        <option value="SEPT">September</option>
+                        <option value="OCT">October</option>
+                        <option value="NOV">November</option>
+                        <option value="DEC">December</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="summary-stats" id="summaryStats">
+            <div class="stat-card stat-on-target">
+                <div class="stat-label">On Target</div>
+                <div class="stat-value" id="statOnTarget">0</div>
+            </div>
+            <div class="stat-card stat-below-target">
+                <div class="stat-label">Below Target</div>
+                <div class="stat-value" id="statBelowTarget">0</div>
+            </div>
+            <div class="stat-card stat-health">
+                <div class="stat-label">Overall Health</div>
+                <div class="stat-value" id="statHealth">0%</div>
+            </div>
+        </div>
+
+        <div class="kpi-cards" id="kpiCards"></div>
+
+        <div class="charts-section">
+            <div class="chart-container">
+                <div class="chart-title">Current Performance vs Target</div>
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <div id="siteComparisonSection" style="display: none;">
+            <div class="charts-section">
+                <div class="chart-container">
+                    <div class="chart-title">KPI Performance by Site</div>
+                    <canvas id="siteComparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="executiveSummarySection" class="executive-summary">
+            <div class="site-health-grid" id="siteHealthGrid"></div>
+        </div>
+
+
+        <div class="table-section">
+            <div class="table-title">Detailed KPI Data</div>
+            <table id="kpiTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>KPI</th>
+                        <th>Current</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            <div id="noData" class="no-data">No data available. Use Ctrl+Shift+D to import data.</div>
+        </div>
+
+        <!-- KPI Detail Modal -->
+        <div class="kpi-modal" id="kpiModal">
+            <div class="kpi-modal-content">
+                <div class="kpi-modal-header">
+                    <div class="kpi-modal-title" id="modalKpiTitle"></div>
+                    <div class="kpi-modal-close" onclick="closeKpiModal()">&times;</div>
+                </div>
+
+                <div class="kpi-view-toggle">
+                    <button class="toggle-btn active" onclick="switchKpiView('by-site')">By Site</button>
+                    <button class="toggle-btn" onclick="switchKpiView('over-time')">Over Time</button>
+                </div>
+
+                <div class="kpi-detail-filters" id="bySiteFilters">
+                    <label>Month:</label>
+                    <select id="modalMonthSelect" onchange="updateKpiDetail()">
+                        <option value="JAN">January</option>
+                        <option value="FEB">February</option>
+                        <option value="MAR">March</option>
+                        <option value="APR">April</option>
+                        <option value="MAY">May</option>
+                        <option value="JUN">June</option>
+                        <option value="JULY">July</option>
+                        <option value="AUG">August</option>
+                        <option value="SEPT">September</option>
+                        <option value="OCT">October</option>
+                        <option value="NOV">November</option>
+                        <option value="DEC">December</option>
+                    </select>
+                </div>
+
+                <div class="kpi-detail-filters" id="overTimeFilters" style="display: none;">
+                    <div class="site-filter">
+                        <label><input type="checkbox" value="GDL" checked onchange="updateKpiDetail()"> GDL</label>
+                        <label><input type="checkbox" value="MNL" checked onchange="updateKpiDetail()"> MNL</label>
+                        <label><input type="checkbox" value="CR" checked onchange="updateKpiDetail()"> CR</label>
+                        <label><input type="checkbox" value="RIC" checked onchange="updateKpiDetail()"> RIC</label>
+                    </div>
+                </div>
+
+                <div class="kpi-detail-chart">
+                    <canvas id="kpiDetailChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden data import section -->
+        <div class="data-input" id="dataInputSection">
+            <h3>📋 Import KPI Data</h3>
+            <div class="month-selector">
+                <label>Enter data for:</label>
+                <select id="inputMonth">
+                    <option value="JAN">January</option>
+                    <option value="FEB">February</option>
+                    <option value="MAR">March</option>
+                    <option value="APR">April</option>
+                    <option value="MAY">May</option>
+                    <option value="JUN">June</option>
+                    <option value="JULY">July</option>
+                    <option value="AUG">August</option>
+                    <option value="SEPT">September</option>
+                    <option value="OCT">October</option>
+                    <option value="NOV">November</option>
+                    <option value="DEC">December</option>
+                </select>
+            </div>
+            <textarea id="dataInput" placeholder="KPI name	Target	GDL	MNL	CR	RIC"></textarea>
+            <div class="btn-group">
+                <button onclick="loadData()">Load Data</button>
+                <button onclick="clearAllData()">Clear All</button>
+                <button onclick="hideDataInput()">Hide</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let monthlyData = {"2026":{"JAN":{"CS CSAT":{"target":80,"GDL":93,"MNL":71,"CR":86,"RIC":84},"CLL CSAT":{"target":80,"GDL":88,"MNL":71,"CR":null,"RIC":80},"RCVR CSAT":{"target":70,"GDL":75,"MNL":86,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":446,"MNL":458,"CR":464,"RIC":414},"ESC RATE":{"target":5,"GDL":3.3,"MNL":4.8,"CR":5.7,"RIC":3.9},"FCR":{"target":90,"GDL":80,"MNL":77,"CR":73,"RIC":80},"CS ISAR":{"target":100,"GDL":91,"MNL":79.2,"CR":84.5,"RIC":null},"CLL ISAR":{"target":100,"GDL":107,"MNL":93.9,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":102,"MNL":88.7,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.4,"MNL":98,"CR":100,"RIC":98},"BI":{"target":95,"GDL":98.8,"MNL":98.4,"CR":99.8,"RIC":100},"CHAT MFRT":{"target":10,"GDL":48,"MNL":19,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":93.9,"MNL":90.5,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":2,"MNL":9,"CR":0,"RIC":0}},"FEB":{"CS CSAT":{"target":80,"GDL":92,"MNL":71,"CR":90,"RIC":92},"CLL CSAT":{"target":80,"GDL":83,"MNL":70,"CR":null,"RIC":83},"RCVR CSAT":{"target":70,"GDL":83,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":402,"MNL":466,"CR":464,"RIC":414},"ESC RATE":{"target":5,"GDL":4.1,"MNL":4.9,"CR":1.2,"RIC":3.8},"FCR":{"target":90,"GDL":80,"MNL":77,"CR":79,"RIC":80},"CS ISAR":{"target":100,"GDL":93,"MNL":94.2,"CR":89.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":102,"MNL":100.5,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":98,"MNL":103.9,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.2,"MNL":97.3,"CR":100,"RIC":94},"BI":{"target":95,"GDL":98.4,"MNL":98.4,"CR":99.7,"RIC":98},"CHAT MFRT":{"target":10,"GDL":19,"MNL":19,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":87.9,"MNL":82.7,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":2,"MNL":7,"CR":0,"RIC":0}},"MAR":{"CS CSAT":{"target":80,"GDL":91,"MNL":68,"CR":86,"RIC":82},"CLL CSAT":{"target":80,"GDL":89,"MNL":68,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":81,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":433,"MNL":474,"CR":522,"RIC":412},"ESC RATE":{"target":5,"GDL":3.8,"MNL":4.9,"CR":9.4,"RIC":2.7},"FCR":{"target":90,"GDL":80,"MNL":78,"CR":80,"RIC":78},"CS ISAR":{"target":100,"GDL":87,"MNL":108.1,"CR":91.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":117,"MNL":98.5,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":103,"MNL":105.1,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.9,"MNL":97.4,"CR":95,"RIC":93},"BI":{"target":95,"GDL":98.5,"MNL":99.3,"CR":98.9,"RIC":97},"CHAT MFRT":{"target":10,"GDL":10,"MNL":7,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":91.1,"MNL":83.2,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":6,"MNL":3,"CR":20,"RIC":42}},"APR":{"CS CSAT":{"target":80,"GDL":93,"MNL":73,"CR":85,"RIC":90},"CLL CSAT":{"target":80,"GDL":82,"MNL":71,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":83,"MNL":77,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":455,"MNL":469,"CR":485,"RIC":545},"ESC RATE":{"target":5,"GDL":3.9,"MNL":5.2,"CR":0.9,"RIC":2.9},"FCR":{"target":90,"GDL":80,"MNL":78,"CR":78,"RIC":78},"CS ISAR":{"target":100,"GDL":103.2,"MNL":107.3,"CR":102.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":106.3,"MNL":107.7,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":108.2,"MNL":106.3,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":99.3,"MNL":95.2,"CR":96.6,"RIC":100},"BI":{"target":95,"GDL":98.7,"MNL":98.1,"CR":96.1,"RIC":98},"CHAT MFRT":{"target":10,"GDL":11,"MNL":7,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":89.9,"MNL":86.4,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":4,"MNL":12,"CR":27,"RIC":25}},"MAY":{"CS CSAT":{"target":80,"GDL":93,"MNL":71,"CR":86,"RIC":85},"CLL CSAT":{"target":80,"GDL":89,"MNL":69,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":100,"MNL":71,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":456,"MNL":473,"CR":469,"RIC":453},"ESC RATE":{"target":5,"GDL":3.8,"MNL":5,"CR":0.9,"RIC":3.4},"FCR":{"target":90,"GDL":80,"MNL":79,"CR":77,"RIC":80},"CS ISAR":{"target":100,"GDL":93.5,"MNL":108.1,"CR":104.5,"RIC":null},"CLL ISAR":{"target":100,"GDL":88.7,"MNL":109.4,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":105.8,"MNL":105.8,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":100,"MNL":98.9,"CR":100,"RIC":100},"BI":{"target":95,"GDL":99.1,"MNL":99.2,"CR":100,"RIC":100},"CHAT MFRT":{"target":10,"GDL":13,"MNL":9,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":93.4,"MNL":86.6,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":5,"MNL":3,"CR":0,"RIC":0}},"JUN":{"CS CSAT":{"target":80,"GDL":89,"MNL":71,"CR":95,"RIC":86},"CLL CSAT":{"target":80,"GDL":87,"MNL":71,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":70,"MNL":94,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":456,"MNL":473,"CR":480,"RIC":455},"ESC RATE":{"target":5,"GDL":4.3,"MNL":5.5,"CR":0.4,"RIC":3.1},"FCR":{"target":90,"GDL":79,"MNL":79,"CR":72,"RIC":79},"CS ISAR":{"target":100,"GDL":94.5,"MNL":106.7,"CR":106.6,"RIC":null},"CLL ISAR":{"target":100,"GDL":103.7,"MNL":106,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":91.3,"MNL":104.3,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":100,"MNL":92.4,"CR":100,"RIC":100},"BI":{"target":95,"GDL":99.7,"MNL":98.8,"CR":100,"RIC":99},"CHAT MFRT":{"target":10,"GDL":12,"MNL":8,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":91,"MNL":85.2,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":5,"MNL":4,"CR":0,"RIC":0}},"JULY":{"CS CSAT":{"target":80,"GDL":87.0,"MNL":75.1,"CR":90.0,"RIC":84.7},"CLL CSAT":{"target":80,"GDL":80.0,"MNL":67.8,"CR":null,"RIC":null},"RCVR CSAT":{"target":70,"GDL":75.0,"MNL":80.0,"CR":null,"RIC":null},"CS AHT":{"target":450,"GDL":415,"MNL":499,"CR":484,"RIC":472},"ESC RATE":{"target":5,"GDL":3.6,"MNL":4.8,"CR":0.7,"RIC":3.9},"FCR":{"target":90,"GDL":79.0,"MNL":78.0,"CR":69.0,"RIC":78.0},"CS ISAR":{"target":100,"GDL":84.0,"MNL":106.1,"CR":103.9,"RIC":null},"CLL ISAR":{"target":100,"GDL":81.0,"MNL":105.4,"CR":null,"RIC":null},"RCVR ISAR":{"target":100,"GDL":86.0,"MNL":104.0,"CR":null,"RIC":null},"COMPLIANCE":{"target":95,"GDL":97.5,"MNL":98.4,"CR":100.0,"RIC":94.0},"BI":{"target":95,"GDL":97.5,"MNL":98.9,"CR":99.1,"RIC":98.0},"CHAT MFRT":{"target":10,"GDL":12,"MNL":9,"CR":null,"RIC":null},"CHAT CSAT":{"target":90,"GDL":92.3,"MNL":81.3,"CR":null,"RIC":null},"ATTRITION":{"target":5,"GDL":7.0,"MNL":14.0,"CR":0.0,"RIC":0.0}},"AUG":{},"SEPT":{},"OCT":{},"NOV":{},"DEC":{}},"2027":{"JAN":{},"FEB":{},"MAR":{},"APR":{},"MAY":{},"JUN":{},"JULY":{},"AUG":{},"SEPT":{},"OCT":{},"NOV":{},"DEC":{}}};
+        let selectedSites = {GDL: true, MNL: true, CR: true, RIC: true};
+        let performanceChart, siteChart, siteComparisonChart;
+        let currentKpiDetail = null;
+        let kpiDetailChart = null;
+        let currentKpiView = 'by-site';
+
+        // Load data from localStorage on page load
+        function loadFromStorage() {
+            const stored = localStorage.getItem('kpiDashboardData');
+            if (stored) {
+                try {
+                    monthlyData = JSON.parse(stored);
+                } catch (e) {
+                    console.error('Failed to load stored data:', e);
+                }
+            }
+        }
+
+        // Save data to localStorage
+        function saveToStorage() {
+            localStorage.setItem('kpiDashboardData', JSON.stringify(monthlyData));
+        }
+
+        loadFromStorage();
+
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.altKey && e.code === 'KeyD') {
+                document.getElementById('dataInputSection').classList.toggle('show');
+            }
+        });
+
+        function toggleSite(site) {
+            selectedSites[site] = !selectedSites[site];
+            document.querySelector(`button[onclick="toggleSite('${site}')"]`).classList.toggle('active');
+            updateDashboard();
+        }
+
+        function loadData() {
+            const input = document.getElementById('dataInput').value.trim();
+            const year = document.getElementById('yearSelect').value;
+            const month = document.getElementById('inputMonth').value;
+            if (!input) { alert('Paste data first'); return; }
+
+            // Ensure year exists and clear this month's data only
+            if (!monthlyData[year]) {
+                monthlyData[year] = {};
+            }
+            monthlyData[year][month] = {};
+            let count = 0;
+            console.log(`Loading data for ${year} ${month}`);
+
+            input.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line) return; // Skip empty lines
+
+                const parts = line.split('\t').map(s => s.trim());
+                if (parts.length >= 2) { // At minimum: KPI name and target
+                    const kpi = parts[0];
+                    // Strip % and s symbols before parsing
+                    const cleanValue = (val) => parseFloat(val.toString().replace(/[%s]/g, ''));
+                    const target = cleanValue(parts[1]);
+
+                    if (kpi && !isNaN(target)) {
+                        // Parse site values - handle variable number of columns, treat dashes as no data
+                        const gdl = (parts[2] && parts[2] !== '-') ? cleanValue(parts[2]) : NaN;
+                        const mnl = (parts[3] && parts[3] !== '-') ? cleanValue(parts[3]) : NaN;
+                        const cr = (parts[4] && parts[4] !== '-') ? cleanValue(parts[4]) : NaN;
+                        const ric = (parts[5] && parts[5] !== '-') ? cleanValue(parts[5]) : NaN;
+
+                        // Only add if at least one site has data
+                        if (!isNaN(gdl) || !isNaN(mnl) || !isNaN(cr) || !isNaN(ric)) {
+                            monthlyData[year][month][kpi] = {
+                                target: target,
+                                GDL: gdl,
+                                MNL: mnl,
+                                CR: cr,
+                                RIC: ric
+                            };
+                            count++;
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('dataInput').value = '';
+            saveToStorage();
+            console.log(`✓ Saved ${count} KPIs to ${year} ${month}`);
+            console.log(`Data in ${month}:`, Object.keys(monthlyData[year][month]).length, 'KPIs');
+            console.log(`All 2026 months:`, Object.keys(monthlyData['2026']).map(m => `${m}:${Object.keys(monthlyData['2026'][m]).length}`).join(' | '));
+            updateDashboard();
+            alert(`Data loaded for ${month} ${year}! (${count} KPIs)`);
+        }
+
+        function clearAllData() {
+            if (confirm('Clear all data?')) {
+                monthlyData = {
+                    '2026': {'JAN': {}, 'FEB': {}, 'MAR': {}, 'APR': {}, 'MAY': {}, 'JUN': {}, 'JULY': {}, 'AUG': {}, 'SEPT': {}, 'OCT': {}, 'NOV': {}, 'DEC': {}},
+                    '2027': {'JAN': {}, 'FEB': {}, 'MAR': {}, 'APR': {}, 'MAY': {}, 'JUN': {}, 'JULY': {}, 'AUG': {}, 'SEPT': {}, 'OCT': {}, 'NOV': {}, 'DEC': {}}
+                };
+                saveToStorage();
+                updateDashboard();
+            }
+        }
+
+        function hideDataInput() {
+            document.getElementById('dataInputSection').classList.remove('show');
+        }
+
+        let comparisonEnabled = false;
+
+        function toggleComparison() {
+            comparisonEnabled = document.getElementById('compareToggle').checked;
+            const compareControls = document.getElementById('compareControls');
+            compareControls.style.display = comparisonEnabled ? 'flex' : 'none';
+
+            // Set compare month to previous month by default
+            if (comparisonEnabled) {
+                const currentMonth = document.getElementById('monthSelect').value;
+                const prevMonth = getPreviousMonth(currentMonth);
+                document.getElementById('compareMonthSelect').value = prevMonth;
+            }
+
+            updateDashboard();
+        }
+
+        function getPreviousMonth(currentMonth) {
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JULY', 'AUG', 'SEPT', 'OCT', 'NOV', 'DEC'];
+            const currentIndex = months.indexOf(currentMonth);
+            if (currentIndex === 0) return 'DEC'; // If January, previous is December
+            return months[currentIndex - 1];
+        }
+
+        function drawExecutiveSummary(year) {
+            // Hide standard sections
+            document.getElementById('summaryStats').style.display = 'none';
+            document.getElementById('kpiCards').style.display = 'none';
+            document.querySelector('.charts-section').style.display = 'none';
+            document.getElementById('kpiTable').style.display = 'none';
+            document.getElementById('siteComparisonSection').style.display = 'none';
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('executiveSummarySection').classList.add('show');
+
+            // Calculate YTD data
+            const ytdData = {};
+            const months = Object.keys(monthlyData[year]);
+            for (let m of months) {
+                const monthData = monthlyData[year][m];
+                for (let kpi in monthData) {
+                    if (!ytdData[kpi]) {
+                        ytdData[kpi] = { target: monthData[kpi].target, sums: {GDL: 0, MNL: 0, CR: 0, RIC: 0}, counts: {GDL: 0, MNL: 0, CR: 0, RIC: 0} };
+                    }
+                    ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                        const val = monthData[kpi][site];
+                        if (!isNaN(val) && val !== null) {
+                            ytdData[kpi].sums[site] += val;
+                            ytdData[kpi].counts[site]++;
+                        }
+                    });
+                }
+            }
+
+            // Convert to averages
+            for (let kpi in ytdData) {
+                ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                    ytdData[kpi][site] = ytdData[kpi].counts[site] > 0 ? ytdData[kpi].sums[site] / ytdData[kpi].counts[site] : null;
+                });
+                delete ytdData[kpi].sums;
+                delete ytdData[kpi].counts;
+            }
+
+            const sites = ['GDL', 'MNL', 'CR', 'RIC'];
+            const siteNames = {'GDL': 'Guadalajara', 'MNL': 'Manila', 'CR': 'Costa Rica', 'RIC': 'Richmond'};
+
+            const cardsHTML = sites.map(site => {
+                const siteKpis = {};
+                let weightedOnTarget = 0;
+                let totalWeight = 0;
+                let onTargetCount = 0;
+                const priorityMetrics = ['CS CSAT', 'CLL CSAT', 'RCVR CSAT', 'CS AHT'];
+                const lowPriorityMetrics = ['CHAT MFRT', 'CHAT CSAT'];
+                const priorityWeight = 1.25;
+                const lowPriorityWeight = 0.5;
+
+                for (let kpi in ytdData) {
+                    const value = ytdData[kpi][site];
+                    if (value !== null && !isNaN(value)) {
+                        const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
+                        const isOnTarget = lowerBetter ? value <= ytdData[kpi].target : value >= ytdData[kpi].target;
+                        let weight = 1;
+                        if (priorityMetrics.includes(kpi)) weight = priorityWeight;
+                        else if (lowPriorityMetrics.includes(kpi)) weight = lowPriorityWeight;
+
+                        totalWeight += weight;
+                        if (isOnTarget) {
+                            weightedOnTarget += weight;
+                            onTargetCount++;
+                        }
+                        siteKpis[kpi] = {value, target: ytdData[kpi].target, isOnTarget, lowerBetter};
+                    }
+                }
+
+                const healthPercent = totalWeight > 0 ? Math.round((weightedOnTarget / totalWeight) * 100) : 0;
+                const totalKpis = Object.keys(siteKpis).length;
+                let healthClass = 'health-excellent';
+                if (healthPercent < 50) healthClass = 'health-poor';
+                else if (healthPercent < 70) healthClass = 'health-fair';
+                else if (healthPercent < 85) healthClass = 'health-good';
+
+                // Get top problems (off-target KPIs) - prioritize weighted metrics
+                const problems = Object.entries(siteKpis)
+                    .filter(([kpiName, kpi]) => !kpi.isOnTarget)
+                    .map(([kpiName, kpi]) => {
+                        const percentGap = kpi.lowerBetter ? ((kpi.value - kpi.target) / kpi.target) * 100 : ((kpi.target - kpi.value) / kpi.target) * 100;
+                        const isPriority = priorityMetrics.includes(kpiName);
+                        const isLowPriority = lowPriorityMetrics.includes(kpiName);
+                        return [kpiName, {...kpi, percentGap, isPriority, isLowPriority}];
+                    })
+                    .sort((a, b) => {
+                        // Prioritize high-weight metrics, deprioritize low-weight metrics, then sort by gap
+                        if (a[1].isPriority && !b[1].isPriority) return -1;
+                        if (!a[1].isPriority && b[1].isPriority) return 1;
+                        if (a[1].isLowPriority && !b[1].isLowPriority) return 1;
+                        if (!a[1].isLowPriority && b[1].isLowPriority) return -1;
+                        return b[1].percentGap - a[1].percentGap;
+                    })
+                    .slice(0, 2);
+
+                // Get top performers (on-target KPIs)
+                const winners = Object.entries(siteKpis)
+                    .filter(([_, kpi]) => kpi.isOnTarget)
+                    .slice(0, 2);
+
+                let problemsHTML = problems.length > 0 ? problems.map(([kpi]) =>
+                    `<div class="metric-item"><span class="metric-name">${kpi}</span><span class="metric-value metric-off">❌</span></div>`
+                ).join('') : '<div style="color: #999; font-size: 12px;">All metrics on target!</div>';
+
+                let winnersHTML = winners.length > 0 ? winners.map(([kpi]) =>
+                    `<div class="metric-item"><span class="metric-name">${kpi}</span><span class="metric-value metric-on">✓</span></div>`
+                ).join('') : '<div style="color: #999; font-size: 12px;">No metrics on target yet</div>';
+
+                return `
+                    <div class="site-health-card ${healthClass}">
+                        <div class="site-name">${siteNames[site]}</div>
+                        <div class="health-score-container">
+                            <div class="health-score ${healthClass}">${healthPercent}%</div>
+                            <div class="health-label">Overall Health YTD</div>
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">📊 On Target KPIs</div>
+                            <div>${onTargetCount} of ${totalKpis} metrics</div>
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">⚠️ Top Problem Areas</div>
+                            ${problemsHTML}
+                        </div>
+                        <div class="metrics-section">
+                            <div class="metrics-title">⭐ Top Performers</div>
+                            ${winnersHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('siteHealthGrid').innerHTML = cardsHTML;
+        }
+
+        function updateDashboard() {
+            const year = document.getElementById('yearSelect').value;
+            const month = document.getElementById('monthSelect').value;
+            const viewType = document.getElementById('viewType').value;
+
+            if (viewType === 'executive-summary') {
+                drawExecutiveSummary(year);
+                return;
+            }
+
+            if (viewType === 'site-comparison') {
+                const data = monthlyData[year][month];
+                if (!data || Object.keys(data).length === 0) {
+                    document.getElementById('siteComparisonSection').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    return;
+                }
+                document.getElementById('summaryStats').style.display = 'none';
+                document.getElementById('kpiCards').style.display = 'none';
+                document.querySelector('.charts-section').style.display = 'none';
+                document.getElementById('kpiTable').style.display = 'none';
+                document.getElementById('executiveSummarySection').classList.remove('show');
+                document.getElementById('siteComparisonSection').style.display = 'block';
+                document.getElementById('noData').style.display = 'none';
+                setTimeout(() => drawSiteComparisonChart(data), 100);
+                document.getElementById('updateTime').textContent = new Date().toLocaleString();
+                return;
+            }
+
+            // Show standard view sections (restores original layout)
+            document.getElementById('summaryStats').style.display = 'grid';
+            document.getElementById('kpiCards').style.display = 'grid';
+            document.querySelector('.charts-section').style.display = 'grid';
+            document.getElementById('siteComparisonSection').style.display = 'none';
+            document.getElementById('executiveSummarySection').classList.remove('show');
+
+            // For YTD view, aggregate data across all months
+            let data = {};
+            if (viewType === 'ytd') {
+                // Calculate YTD averages across all months for each KPI and site
+                const months = Object.keys(monthlyData[year]);
+                for (let m of months) {
+                    const monthData = monthlyData[year][m];
+                    for (let kpi in monthData) {
+                        if (!data[kpi]) {
+                            data[kpi] = { target: monthData[kpi].target, sums: {GDL: 0, MNL: 0, CR: 0, RIC: 0}, counts: {GDL: 0, MNL: 0, CR: 0, RIC: 0} };
+                        }
+                        // Sum values for each site
+                        ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                            const val = monthData[kpi][site];
+                            if (!isNaN(val) && val !== null) {
+                                data[kpi].sums[site] += val;
+                                data[kpi].counts[site]++;
+                            }
+                        });
+                    }
+                }
+                // Convert sums to averages
+                for (let kpi in data) {
+                    ['GDL', 'MNL', 'CR', 'RIC'].forEach(site => {
+                        data[kpi][site] = data[kpi].counts[site] > 0 ? data[kpi].sums[site] / data[kpi].counts[site] : null;
+                    });
+                    delete data[kpi].sums;
+                    delete data[kpi].counts;
+                }
+            } else {
+                data = monthlyData[year][month];
+            }
+
+            if (Object.keys(data).length === 0) {
+                document.getElementById('kpiCards').innerHTML = '';
+                document.getElementById('kpiTable').style.display = 'none';
+                document.getElementById('noData').style.display = 'block';
+                document.getElementById('updateTime').textContent = new Date().toLocaleString();
+                return;
+            }
+
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('kpiTable').style.display = 'table';
+
+            // KPI Cards
+            const cards = Object.entries(data).map(([kpi, vals]) => {
+                const activeSites = Object.keys(selectedSites).filter(s => selectedSites[s]);
+                const values = activeSites.map(s => vals[s]).filter(v => !isNaN(v) && v !== null);
+
+                // Skip cards if no active site has data for this KPI
+                if (values.length === 0) {
+                    return '';
+                }
+
+                const avg = values.length ? values.reduce((a,b) => a+b) / values.length : 0;
+
+                // Determine if on target and calculate distance from target
+                const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
+                let statusClass = 'on-target';
+                let onTarget = false;
+
+                if (lowerBetter) {
+                    onTarget = avg <= vals.target;
+                    if (!onTarget) {
+                        const percentageOver = ((avg - vals.target) / vals.target) * 100;
+                        if (percentageOver <= 10) statusClass = 'slightly-below';
+                        else if (percentageOver <= 25) statusClass = 'moderately-below';
+                        else statusClass = 'off-target';
+                    }
+                } else {
+                    onTarget = avg >= vals.target;
+                    if (!onTarget) {
+                        const percentageUnder = ((vals.target - avg) / vals.target) * 100;
+                        if (percentageUnder <= 10) statusClass = 'slightly-below';
+                        else if (percentageUnder <= 25) statusClass = 'moderately-below';
+                        else statusClass = 'off-target';
+                    }
+                }
+
+                // Calculate trend from previous month
+                const prevMonth = getPreviousMonth(month);
+                const prevData = monthlyData[year] && monthlyData[year][prevMonth] ? monthlyData[year][prevMonth] : {};
+                let trendIndicator = '';
+
+                if (prevData[kpi]) {
+                    const prevVals = activeSites.map(s => prevData[kpi][s]).filter(v => !isNaN(v) && v !== null);
+                    const prevAvg = prevVals.length > 0 ? prevVals.reduce((a,b) => a+b) / prevVals.length : null;
+
+                    if (prevAvg !== null && !isNaN(prevAvg)) {
+                        if (lowerBetter) {
+                            // For lower-is-better metrics: down is good (green), up is bad (red)
+                            if (avg < prevAvg) {
+                                trendIndicator = '<span class="kpi-trend trend-up">↓</span>';
+                            } else if (avg > prevAvg) {
+                                trendIndicator = '<span class="kpi-trend trend-down">↑</span>';
+                            }
+                        } else {
+                            // For higher-is-better metrics: up is good (green), down is bad (red)
+                            if (avg > prevAvg) {
+                                trendIndicator = '<span class="kpi-trend trend-up">↑</span>';
+                            } else if (avg < prevAvg) {
+                                trendIndicator = '<span class="kpi-trend trend-down">↓</span>';
+                            }
+                        }
+                    }
+                }
+
+                let comparisonHTML = '';
+                if (comparisonEnabled) {
+                    const compareMonth = document.getElementById('compareMonthSelect').value;
+                    const compareData = monthlyData[year][compareMonth];
+                    if (compareData && compareData[kpi]) {
+                        const compareVals = activeSites.map(s => compareData[kpi][s]).filter(v => !isNaN(v) && v !== null);
+                        const compareAvg = compareVals.length ? compareVals.reduce((a,b) => a+b) / compareVals.length : 0;
+                        const variance = (avg - compareAvg).toFixed(1);
+                        const varianceSign = variance > 0 ? '+' : '';
+                        const varianceColor = (lowerBetter && variance < 0) || (!lowerBetter && variance > 0) ? '#16a34a' : '#dc2626';
+                        comparisonHTML = `<div style="font-size: 10px; color: #999; margin-top: 4px;">vs ${compareMonth}: <span style="color: ${varianceColor}; font-weight: 600;">${varianceSign}${variance}</span></div>`;
+                    }
+                }
+
+                return `
+                    <div class="kpi-card ${statusClass}" onclick="openKpiModal('${kpi}')" style="cursor: pointer;">
+                        <div class="kpi-label">${kpi}</div>
+                        <div class="kpi-value">
+                            ${typeof avg === 'number' && avg % 1 !== 0 ? avg.toFixed(1) : avg}${['CS AHT', 'CHAT MFRT'].includes(kpi) ? '' : '%'}
+                            ${trendIndicator}
+                        </div>
+                        <div class="kpi-target">Target: <span>${vals.target}${['CS AHT', 'CHAT MFRT'].includes(kpi) ? '' : '%'}</span></div>
+                        ${comparisonHTML}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('kpiCards').innerHTML = cards;
+
+            // Table
+            const rows = Object.entries(data).map(([kpi, vals]) => {
+                const activeSites = Object.keys(selectedSites).filter(s => selectedSites[s]);
+                const values = activeSites.map(s => vals[s]).filter(v => !isNaN(v) && v !== null);
+
+                // Skip rows if no active site has data for this KPI
+                if (values.length === 0) {
+                    return '';
+                }
+
+                const avg = values.length ? values.reduce((a,b) => a+b) / values.length : 0;
+                const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
+                let onTarget = false;
+                let status = '✗ Below Target';
+                let statusClass = 'status-off';
+
+                if (lowerBetter) {
+                    onTarget = avg <= vals.target;
+                    if (onTarget) {
+                        status = '✓ On Target';
+                        statusClass = 'status-on';
+                    }
+                } else {
+                    onTarget = avg >= vals.target;
+                    if (onTarget) {
+                        status = '✓ On Target';
+                        statusClass = 'status-on';
+                    }
+                }
+
+                return `
+                    <tr>
+                        <td class="kpi-name">${kpi}</td>
+                        <td>${typeof avg === 'number' && avg % 1 !== 0 ? avg.toFixed(1) : avg}${['CS AHT', 'CHAT MFRT'].includes(kpi) ? '' : '%'}</td>
+                        <td>${vals.target}${['CS AHT', 'CHAT MFRT'].includes(kpi) ? '' : '%'}</td>
+                        <td class="${statusClass}">${status}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('tableBody').innerHTML = rows;
+
+            // Update Summary Stats
+            updateSummaryStats(data);
+
+            // Charts - delay slightly to ensure canvas is ready
+            setTimeout(() => {
+                drawCharts(data);
+            }, 100);
+            document.getElementById('updateTime').textContent = new Date().toLocaleString();
+        }
+
+        function updateSummaryStats(data) {
+            const summaryStats = document.getElementById('summaryStats');
+
+            // Hide stats if no data for this month
+            if (Object.keys(data).length === 0) {
+                summaryStats.style.display = 'none';
+                return;
+            }
+
+            summaryStats.style.display = 'grid';
+
+            const activeSites = Object.keys(selectedSites).filter(s => selectedSites[s]);
+            let onTargetCount = 0;
+            let belowTargetCount = 0;
+
+            Object.entries(data).forEach(([kpi, vals]) => {
+                const values = activeSites.map(s => vals[s]).filter(v => !isNaN(v) && v !== null);
+
+                // Skip metrics with no data for any active site
+                if (values.length === 0) {
+                    return;
+                }
+
+                const avg = values.length ? values.reduce((a,b) => a+b) / values.length : 0;
+
+                const lowerBetter = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'].includes(kpi);
+                const onTarget = lowerBetter ? avg <= vals.target : avg >= vals.target;
+
+                if (onTarget) {
+                    onTargetCount++;
+                } else {
+                    belowTargetCount++;
+                }
+            });
+
+            const total = onTargetCount + belowTargetCount;
+            const healthPercent = total > 0 ? Math.round((onTargetCount / total) * 100) : 0;
+
+            document.getElementById('statOnTarget').textContent = onTargetCount;
+            document.getElementById('statBelowTarget').textContent = belowTargetCount;
+            document.getElementById('statHealth').textContent = healthPercent + '%';
+        }
+
+        function drawCharts(data) {
+            console.log('drawCharts called with data:', Object.keys(data).length, 'KPIs');
+            console.log('Chart library loaded:', typeof Chart !== 'undefined');
+
+            try {
+                const labels = Object.keys(data);
+                const activeSites = Object.keys(selectedSites).filter(s => selectedSites[s]);
+
+                console.log('Labels:', labels);
+                console.log('Active sites:', activeSites);
+
+                if (labels.length === 0) {
+                    console.log('No labels, returning');
+                    return;
+                }
+
+                // Performance vs Target
+                const values = labels.map(kpi => {
+                    const vals = activeSites.map(s => data[kpi][s]).filter(v => !isNaN(v) && v !== null);
+                    return vals.length ? vals.reduce((a,b) => a+b) / vals.length : 0;
+                });
+                const targets = labels.map(kpi => data[kpi].target || 0);
+
+                // Color code bars based on on-target vs off-target
+                const lowerBetterMetrics = ['CS AHT', 'ESC RATE', 'ATTRITION', 'TRANSFER RATE', 'CHAT MFRT'];
+                const barColors = labels.map((kpi, i) => {
+                    const lowerBetter = lowerBetterMetrics.includes(kpi);
+                    const onTarget = lowerBetter ? values[i] <= targets[i] : values[i] >= targets[i];
+                    return onTarget ? '#16a34a' : '#dc2626';
+                });
+
+                console.log('Chart 1 - Values:', values, 'Targets:', targets);
+
+                const ctx1 = document.getElementById('performanceChart');
+                console.log('Canvas 1 context:', ctx1 ? 'found' : 'NOT FOUND');
+
+                if (!ctx1) return;
+                if (performanceChart) performanceChart.destroy();
+
+                performanceChart = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {label: 'Current Performance', data: values, backgroundColor: barColors}
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {position: 'bottom'},
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const target = targets[context.dataIndex];
+                                        return 'Current: ' + context.parsed.x.toFixed(1) + ' | Target: ' + target.toFixed(1);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {display: true, color: 'rgba(200, 200, 200, 0.1)'},
+                                ticks: {font: {size: 11}}
+                            },
+                            y: {
+                                ticks: {font: {size: 11, weight: 'bold'}}
+                            }
+                        }
+                    }
+                });
+                console.log('Chart 1 created');
+
+            } catch (e) {
+                console.error('Chart error:', e);
+                console.error('Stack:', e.stack);
+            }
+        }
+
+        function drawSiteComparisonChart(data) {
+            const labels = Object.keys(data);
+            const sites = ['GDL', 'MNL', 'CR', 'RIC'];
+            const datasets = sites.map((site, idx) => {
+                const values = labels.map(kpi => {
+                    const val = data[kpi][site];
+                    return !isNaN(val) && val !== null ? val : 0;
+                });
+                const colors = ['#3b82f6', '#a855f7', '#22c55e', '#f97316'];
+                return {
+                    label: site,
+                    data: values,
+                    backgroundColor: colors[idx]
+                };
+            });
+
+            const ctx = document.getElementById('siteComparisonChart');
+            if (siteComparisonChart) siteComparisonChart.destroy();
+
+            siteComparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        updateDashboard();
+
+        // KPI Detail Modal Functions
+        function openKpiModal(kpi) {
+            currentKpiDetail = kpi;
+            document.getElementById('modalKpiTitle').textContent = kpi;
+            document.getElementById('kpiModal').classList.add('show');
+            document.getElementById('modalMonthSelect').value = document.getElementById('monthSelect').value;
+            currentKpiView = 'by-site';
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.toggle-btn')[0].classList.add('active');
+            document.getElementById('bySiteFilters').style.display = 'flex';
+            document.getElementById('overTimeFilters').style.display = 'none';
+            updateKpiDetail();
+        }
+
+        function closeKpiModal() {
+            document.getElementById('kpiModal').classList.remove('show');
+            currentKpiDetail = null;
+            if (kpiDetailChart) kpiDetailChart.destroy();
+        }
+
+        function switchKpiView(view) {
+            currentKpiView = view;
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (view === 'by-site') {
+                document.getElementById('bySiteFilters').style.display = 'flex';
+                document.getElementById('overTimeFilters').style.display = 'none';
+            } else {
+                document.getElementById('bySiteFilters').style.display = 'none';
+                document.getElementById('overTimeFilters').style.display = 'flex';
+            }
+            updateKpiDetail();
+        }
+
+        function updateKpiDetail() {
+            if (!currentKpiDetail) return;
+            const year = document.getElementById('yearSelect').value;
+
+            if (currentKpiView === 'by-site') {
+                drawKpiBysite(year);
+            } else {
+                drawKpiOverTime(year);
+            }
+        }
+
+        function drawKpiBysite(year) {
+            const month = document.getElementById('modalMonthSelect').value;
+            const data = monthlyData[year][month];
+            const kpiData = data[currentKpiDetail];
+
+            if (!kpiData) return;
+
+            const sites = ['GDL', 'MNL', 'CR', 'RIC'];
+            const values = sites.map(site => kpiData[site]).filter(v => !isNaN(v) && v !== null);
+            const siteLabels = sites.filter((_, i) => !isNaN(kpiData[sites[i]]));
+            const filteredValues = sites.filter(site => !isNaN(kpiData[site])).map(site => kpiData[site]);
+
+            const ctx = document.getElementById('kpiDetailChart');
+            if (kpiDetailChart) kpiDetailChart.destroy();
+
+            kpiDetailChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: siteLabels,
+                    datasets: [{
+                        label: currentKpiDetail,
+                        data: filteredValues,
+                        backgroundColor: ['#3b82f6', '#a855f7', '#22c55e', '#f97316'],
+                        borderRadius: 4
+                    }, {
+                        label: 'Target',
+                        data: Array(siteLabels.length).fill(kpiData.target),
+                        type: 'line',
+                        borderColor: '#dc2626',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#dc2626'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function drawKpiOverTime(year) {
+            const months = Object.keys(monthlyData[year]).filter(m => monthlyData[year][m][currentKpiDetail]);
+            const checkedSites = Array.from(document.querySelectorAll('#overTimeFilters input:checked')).map(cb => cb.value);
+
+            const datasets = checkedSites.map(site => {
+                const values = months.map(month => {
+                    const kpiData = monthlyData[year][month][currentKpiDetail];
+                    return kpiData && !isNaN(kpiData[site]) && kpiData[site] !== 0 ? kpiData[site] : null;
+                });
+                const colors = {GDL: '#3b82f6', MNL: '#a855f7', CR: '#22c55e', RIC: '#f97316'};
+                return {
+                    label: site,
+                    data: values,
+                    borderColor: colors[site],
+                    backgroundColor: colors[site] + '20',
+                    tension: 0.4,
+                    fill: true
+                };
+            });
+
+            const ctx = document.getElementById('kpiDetailChart');
+            if (kpiDetailChart) kpiDetailChart.destroy();
+
+            kpiDetailChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: months, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('kpiModal').addEventListener('click', function(e) {
+            if (e.target === this) closeKpiModal();
+        });
+
+        // CSV Download Function
+        function downloadCSV() {
+            const year = document.getElementById('yearSelect').value;
+            const month = document.getElementById('monthSelect').value;
+            const data = monthlyData[year][month];
+
+            if (Object.keys(data).length === 0) {
+                alert('No data available to download');
+                return;
+            }
+
+            let csv = 'KPI,Target,GDL,MNL,CR,RIC\n';
+
+         
